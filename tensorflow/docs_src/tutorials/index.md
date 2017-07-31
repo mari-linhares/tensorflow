@@ -21,6 +21,9 @@ The following tutorials cover different aspects of image recognition:
   * @{$deep_cnn$Convolutional Neural Networks}, which demonstrates how to
     build a small CNN for recognizing images.  This tutorial is aimed at
     advanced TensorFlow users.
+  * @{$resnet_estimator$ResNet with Estimator API}, which demonstrates how to
+    build a resnet for recognizing images running on a CPU or in multiple GPUs
+    with multiple hosts.  This tutorial is aimed at advanced TensorFlow users.
 
 The following tutorials focus on machine learning problems in human language:
 

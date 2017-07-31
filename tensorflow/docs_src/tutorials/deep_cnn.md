@@ -442,12 +442,10 @@ with a batch size of 64 and compare the training speed.
 [Congratulations!](https://www.youtube.com/watch?v=9bZkp7q19f0) You have
 completed the CIFAR-10 tutorial.
 
-If you are now interested in developing and training your own image
-classification system, we recommend forking this tutorial and replacing
-components to address your image classification problem.
+* If you are now interested in developing and training your own image
+  classification system, we recommend forking this tutorial and replacing
+  components to address your image classification problem.
 
+* Check the tutorial for a [ResNet with Estimators API #TODO: INSERT LINK]()
+  for CIFAR-10.
 
-> **EXERCISE:** Download the
-[Street View House Numbers (SVHN)](http://ufldl.stanford.edu/housenumbers/) data set.
-Fork the CIFAR-10 tutorial and swap in the SVHN as the input data. Try adapting
-the network architecture to improve predictive performance.
