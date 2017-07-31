@@ -448,4 +448,9 @@ completed the CIFAR-10 tutorial.
 
 * Check the tutorial for a [ResNet with Estimators API #TODO: INSERT LINK]()
   for CIFAR-10.
+  
+> **EXERCISE:** Download the
+[Street View House Numbers (SVHN)](http://ufldl.stanford.edu/housenumbers/) data set.
+Fork the CIFAR-10 tutorial and swap in the SVHN as the input data. Try adapting
+the network architecture to improve predictive performance.
 
