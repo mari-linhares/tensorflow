@@ -7,18 +7,19 @@ and assumes expertise and experience in machine learning.
 
 In this guide we'll go through a full code implementation of a ResNet using
 the Estimators API to classify images from CIFAR-10, which is a popular
-dataset for image classification.
+dataset for image classification. This model is ready to run on a CPU,
+multiple GPUs, and also multiple hosts.
 
-We're not going into details about the model itself, the biggest contribution
-of this guide is a practical example of how to build a distributed model and
-multi-gpu with TensorFlow high-level APIs, and what to expect when doing so.
+The focus is not the model itself, the biggest contribution of this guide is
+a practical example of how to build a distributed and multi-gpu model with
+TensorFlow high-level APIs, and what to expect to see as results when doing so.
 
 We assume you're already familiar with:
   * [Basic Estimators](https://www.tensorflow.org/extend/estimators)
-  * [Distributed Tensorflow](https://www.tensorflow.org/deploy/distributed)
+  * [Distributed Tensorflow concepts](https://www.tensorflow.org/deploy/distributed)
 
-Go to this tutorial section before reading this guide:
-  * [Convolution Neural Networks tutorial: Training a model using multiple gpu cards](https://www.tensorflow.org/tutorials/deep_cnn#training_a_model_using_multiple_gpu_cards)
+Also, check to this tutorial section before reading this guide:
+  * [Training a model using multiple gpu cards](https://www.tensorflow.org/tutorials/deep_cnn#training_a_model_using_multiple_gpu_cards)
 
 ## Dataset and Model Overview
 
