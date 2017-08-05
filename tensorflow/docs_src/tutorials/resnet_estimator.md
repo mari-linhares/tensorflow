@@ -1,19 +1,23 @@
-# ResNet with Estimator API (better name?)
+# A guide to Multi-gpu and Distributed TensorFlow with Estimators API (better name?)
 
-> **NOTE:** This tutorial is intended for *advanced* users of TensorFlow
+> **NOTE:** This guide is intended for *advanced* users of TensorFlow
 and assumes expertise and experience in machine learning.
 
 ## Introduction
 
-In this guide we'll go through a full example of a ResNet with CIFAR-10,
-which is a popular dataset for image classification using the Estimators API. We're not going into
-details about the model itself, the biggest contribution of this tutorial is
-a practical example of how to build a distributed model and multi-gpu with
-TensorFlow high-level APIs.
+In this guide we'll go through a full code implementation of a ResNet using
+the Estimators API to classify images from CIFAR-10, which is a popular
+dataset for image classification.
+
+We're not going into details about the model itself, the biggest contribution
+of this guide is a practical example of how to build a distributed model and
+multi-gpu with TensorFlow high-level APIs, and what to expect when doing so.
 
 We assume you're already familiar with:
   * [Basic Estimators](https://www.tensorflow.org/extend/estimators)
   * [Distributed Tensorflow](https://www.tensorflow.org/deploy/distributed)
+
+Go to this tutorial section before reading this guide:
   * [Convolution Neural Networks tutorial: Training a model using multiple gpu cards](https://www.tensorflow.org/tutorials/deep_cnn#training_a_model_using_multiple_gpu_cards)
 
 ## Dataset and Model Overview
@@ -28,10 +32,48 @@ For more details refer to the [CIFAR-10 page](http://www.cs.toronto.edu/~kriz/ci
 and a [Tech Report](http://www.cs.toronto.edu/~kriz/learning-features-2009-TR.pdf)
 by Alex Krizhevsky.
 
+The reason CIFAR-10 was selected was that it is complex enough to exercise
+much of TensorFlow's ability to scale to large models. At the same time,
+the model is small enough to train fast, which is ideal for trying out
+new ideas and experimenting with new techniques.
+
 The model will be a ResNet as proposed in:
 ```
 Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun
 Deep Residual Learning for Image Recognition. arXiv:1512.03385
+```
+
+```
+INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1/: (?, 16, 32, 32)
+INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_1/: (?, 16, 32, 32)
+INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_2/: (?, 16, 32, 32)
+INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_3/: (?, 16, 32, 32)
+INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_4/: (?, 16, 32, 32)
+INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_5/: (?, 16, 32, 32)
+INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_6/: (?, 16, 32, 32)
+INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1/avg_pool/: (?, 16, 16, 16)
+INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1/: (?, 32, 16, 16)
+INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_1/: (?, 32, 16, 16)
+INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_2/: (?, 32, 16, 16)
+INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_3/: (?, 32, 16, 16)
+INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_4/: (?, 32, 16, 16)
+INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1/: (?, 32, 16, 16)
+INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_1/: (?, 32, 16, 16)
+INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_2/: (?, 32, 16, 16)
+INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_3/: (?, 32, 16, 16)
+INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_4/: (?, 32, 16, 16)
+INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_5/: (?, 32, 16, 16)
+INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_6/: (?, 32, 16, 16)
+INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1/avg_pool/: (?, 32, 8, 8)
+INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1/: (?, 64, 8, 8)
+INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_1/: (?, 64, 8, 8)
+INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_2/: (?, 64, 8, 8)
+INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_3/: (?, 64, 8, 8)
+INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_4/: (?, 64, 8, 8)
+INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_5/: (?, 64, 8, 8)
+INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_6/: (?, 64, 8, 8)
+INFO:tensorflow:image after unit resnet/tower_0/global_avg_pool/: (?, 64)
+INFO:tensorflow:image after unit resnet/tower_0/fully_connected/: (?, 11)
 ```
 
 ### Goals
@@ -40,21 +82,16 @@ Deep Residual Learning for Image Recognition. arXiv:1512.03385
    evaluation using the Estimators API.
 2. Provides a template for constructing larger and more sophisticated models.
 
-The reason CIFAR-10 was selected was that it is complex enough to exercise
-much of TensorFlow's ability to scale to large models. At the same time,
-the model is small enough to train fast, which is ideal for trying out
-new ideas and experimenting with new techniques.
-
 ### Highlights of the Tutorial
 
-* Multi-gpu example
-* Distributed example using Experiments
-* Shows how to create your own Hook
-* More details about the Dataset API
-* How to generate TFRecord files
+* Complete code implementation that runs on local CPU, GPUs and on multiple hosts;
+* Explanation about how to run distributed TensorFlow using Experiments;
+* Shows how to create your own Hook;
+* Practical example of a input function built with the Dataset API;
+* Shows how to generate TFRecord files;
 
-We hope that this tutorial provides a launch point for building general models
-with the Estimators API implementing multi-gpu support.
+We hope that this guide provides a launch point for building general models
+with the Estimators API implementing multi-gpu and distributed support.
 
 ## Code Organization
 
@@ -68,7 +105,6 @@ File | Purpose
 [`cifar10_model.py`](https://www.tensorflow.org/code/tensorflow_models/tutorials/image/cifar10_estimator/cifar10_model.py) | Builds the ResNet model.
 [`cifar10_main.py`](https://www.tensorflow.org/code/tensorflow_models/tutorials/image/cifar10_estimator/cifar10_main.py) | Trains a CIFAR-10 model on a CPU, GPU, multiple GPUS and even in multiple machines.
 
-
 ## TFRecord
 
 TensorFlow supports different types of file formats as input: CSV files, Fixed
@@ -77,7 +113,7 @@ about it
 [here](https://www.tensorflow.org/programmers_guide/reading_data#reading_from_files).
 
 The recommended format for TensorFlow is a [TFRecords](https://www.tensorflow.org/api_guides/python/python_io#tfrecords_format_details)
-file, A TFRecords file represents a sequence of (binary) strings. The format
+file. A TFRecords file represents a sequence of (binary) strings. The format
 is not random access, so it is suitable for streaming large amounts of data
 but not suitable if fast sharding or other non-sequential access is desired.
 
@@ -120,93 +156,17 @@ Full examples for popular datasets are available:
   * CIFAR-10: `[generate_cifar10_tfrecords.py](https://github.com/tensorflow/models/blob/master/tutorials/image/cifar10_estimator/generate_cifar10_tfrecords.py)`
   * MNIST: `[tensorflow/examples/how_tos/reading_data/fully_connected_reader.py](https://github.com/tensorflow/tensorflow/blob/r1.2/tensorflow/examples/how_tos/reading_data/fully_connected_reader.py)`
 
-## Estimators
+## Running Distributed TensorFlow with Estimators
 
 Estimators are a high Level abstraction that support all the basic
-operations you need on a Machine Learning model.
+operations you need on a Machine Learning model, they also implement
+best practices, are distributed by design and are ready to be deployed.
 
-![](imgs/estimator.png)
+In this guide we'll focus on the distributed feature of Estimators.
 
-In order to implement our own Estimator we basically need:
-  * An [input function](https://www.tensorflow.org/get_started/input_fn):
-    this is the input pipeline implementation, where you're going to
-    process your data and return the features and labels that will be used
-    for trainining, evaluation and prediction using the Estimator interface.
-  * A [model function](https://www.tensorflow.org/extend/estimators#constructing_the_model_fn):
-    where will actually define our model, and the training, evaluation and
-    prediction operations.
-
-For more about how to implement an Estimator check
-[this tutorial](https://www.tensorflow.org/versions/master/api_docs/python/tf/estimator/Estimator).
-
-### Input function
-
-The input function will define our input pipeline implementation, and it's
-basically a function that manipulates the data and returns the features and
-labels that will be used by the estimator for training, evaluation, and
-prediction.
-
-An efficient and scalable way to implement your own input function is to use the
-[Dataset API](https://github.com/tensorflow/tensorflow/blob/master/tensorflow/docs_src/programmers_guide/datasets.md).
-
-The Dataset API enables you to build complex input pipelines from simple,
-reusable pieces, making it easy to deal with large amounts of data, different
-data formats, and complicated transformations.
-
-Here's an input function implementation using the Dataset API to read a
-TFRecord file.
-
-```python
-# Gets TFRecord from disk and repeats dataset undefinitely.
-dataset = tf.contrib.data.TFRecordDataset(filenames).repeat()
-
-# Parse records.
-dataset = dataset.map(self.parser, num_threads=batch_size,
-                      output_buffer_size=2 * batch_size)
-
-# Potentially shuffle records.
-if self.subset == 'train':
-  min_queue_examples = int(
-      Cifar10DataSet.num_examples_per_epoch(self.subset) * 0.4)
-  # Ensure that the capacity is sufficiently large to provide good random
-  # shuffling.
-  dataset = dataset.shuffle(buffer_size=min_queue_examples + 3 * batch_size)
-
-# Batch it up.
-dataset = dataset.batch(batch_size)
-iterator = dataset.make_one_shot_iterator()
-image_batch, label_batch = iterator.get_next()
-
-return image_batch, label_batch
-```
-
-The Dataset API introduces two new abstractions to TensorFlow: **datasets**
-and **iterators**.
-
-* A Dataset can either be a source or a transformation:
-  * Creating a source (e.g. Dataset.from_tensor_slices()) constructs a dataset
-    from one or more tf.Tensor objects.
-  * Applying a transformation constructs a dataset from one or more
-    tf.contrib.data.Dataset objects.
-    * Repeat: produce multiple epochs;
-    * Shuffle: it maintains a fixed-size buffer and chooses the next element
-      uniformly at random from that buffer;
-    * Batch: constructs a dataset by stacking consecutive elements of another
-      dataset into a single element;
-    * Map: applies a function to each element in.
-
-* A Iterator provides the main way to extract elements from a dataset.
-  The Iterator.get_next() operation yields the next element of a Dataset, and
-  typically acts as the interface between input pipeline code and your model.
-
-## Training and Evaluation in a Distributed Environment
-
-Another great thing about Estimators is that they are built to be easily
-distributed. In other to run the model on a distributed way using
+In other to run the model on a distributed way using
 data-parallelism you can just create an experiment. Experiments know how to
 invoke train and eval in a sensible fashion for distributed training.
-
-Below is the code to create and run an experiment.
 
 ```python
 def get_experiment(estimator, train_input, eval_input):
@@ -232,35 +192,7 @@ def get_experiment(estimator, train_input, eval_input):
 # run training and evaluation using an Experiment
 learn_runner.run(get_experiment(estimator, train_input, eval_input),
                  run_config=run_config)
-
 ```
-#TODO: review and improve this explanation
-
-
-### Visualizing results with TensorFlow
-
-When using Estimators you can also visualize your data in TensorBoard, with no changes in your code. You can use TensorBoard to visualize your TensorFlow graph, plot quantitative metrics about the execution of your graph, and show additional data like images that pass through it.
-
-You'll see something similar to this if you "point" TensorBoard to the `model_dir` you used to train or evaluate your model.
-
-```shell
-# Check TensorBoard during training or after it.
-# Just point TensorBoard to the model_dir you chose on the previous step
-# by default the model_dir is "sentiment_analysis_output"
-$ tensorboard --log_dir="sentiment_analysis_output"
-```
-
-## Distributed
-
-* Talk about experiments and how we're running distributed
-* https://stackoverflow.com/questions/41600321/distributed-tensorflow-the-difference-between-in-graph-replication-and-between
-* https://www.tensorflow.org/deploy/distributed
-
-
-## What to expect
-
-* Results table
-
 
 ### Set TF_CONFIG
 
@@ -327,7 +259,97 @@ By the default environment is *local*, for a distributed setting we need to chan
 ### Running script
 
 Once you have a `TF_CONFIG` configured properly on each host you're ready to run on distributed settings.
+
 #### Master
+
+## Distributed
+
+* Talk about experiments and how we're running distributed
+* https://stackoverflow.com/questions/41600321/distributed-tensorflow-the-difference-between-in-graph-replication-and-between
+* https://www.tensorflow.org/deploy/distributed
+
+### Input function
+
+The input function will define our input pipeline implementation, and it's
+basically a function that manipulates the data and returns the features and
+labels that will be used by the estimator for training, evaluation, and
+prediction.
+
+An efficient and scalable way to implement your own input function is to use the
+[Dataset API](https://github.com/tensorflow/tensorflow/blob/master/tensorflow/docs_src/programmers_guide/datasets.md).
+
+The Dataset API enables you to build complex input pipelines from simple,
+reusable pieces, making it easy to deal with large amounts of data, different
+data formats, and complicated transformations.
+
+Here's an input function implementation using the Dataset API to read a
+TFRecord file.
+
+```python
+# Gets TFRecord from disk and repeats dataset undefinitely.
+dataset = tf.contrib.data.TFRecordDataset(filenames).repeat()
+
+# Parse records.
+dataset = dataset.map(self.parser, num_threads=batch_size,
+                      output_buffer_size=2 * batch_size)
+
+# Potentially shuffle records.
+if self.subset == 'train':
+  min_queue_examples = int(
+      Cifar10DataSet.num_examples_per_epoch(self.subset) * 0.4)
+  # Ensure that the capacity is sufficiently large to provide good random
+  # shuffling.
+  dataset = dataset.shuffle(buffer_size=min_queue_examples + 3 * batch_size)
+
+# Batch it up.
+dataset = dataset.batch(batch_size)
+iterator = dataset.make_one_shot_iterator()
+image_batch, label_batch = iterator.get_next()
+
+return image_batch, label_batch
+```
+
+The Dataset API introduces two new abstractions to TensorFlow: **datasets**
+and **iterators**.
+
+* A Dataset can either be a source or a transformation:
+  * Creating a source (e.g. Dataset.from_tensor_slices()) constructs a dataset
+    from one or more tf.Tensor objects.
+  * Applying a transformation constructs a dataset from one or more
+    tf.contrib.data.Dataset objects.
+    * Repeat: produce multiple epochs;
+    * Shuffle: it maintains a fixed-size buffer and chooses the next element
+      uniformly at random from that buffer;
+    * Batch: constructs a dataset by stacking consecutive elements of another
+      dataset into a single element;
+    * Map: applies a function to each element in.
+
+* A Iterator provides the main way to extract elements from a dataset.
+  The Iterator.get_next() operation yields the next element of a Dataset, and
+  typically acts as the interface between input pipeline code and your model.
+
+## Training and Evaluation in a Distributed Environment
+
+Another great thing about Estimators is that they are built to be easily
+distributed. 
+Below is the code to create and run an experiment.
+
+### Visualizing results with TensorFlow
+
+When using Estimators you can also visualize your data in TensorBoard, with no changes in your code. You can use TensorBoard to visualize your TensorFlow graph, plot quantitative metrics about the execution of your graph, and show additional data like images that pass through it.
+
+You'll see something similar to this if you "point" TensorBoard to the `model_dir` you used to train or evaluate your model.
+
+```shell
+# Check TensorBoard during training or after it.
+# Just point TensorBoard to the model_dir you chose on the previous step
+# by default the model_dir is "sentiment_analysis_output"
+$ tensorboard --log_dir="sentiment_analysis_output"
+```
+## What to expect
+
+* Results table
+
 ```shell
 # Run this on master:
 # Runs an Experiment in sync mode on 4 GPUs using CPU as parameter server for 40000 steps.
@@ -344,132 +366,6 @@ $ python cifar10_main.py --data_dir=gs://path/cifar-10-batches-py \
                          --run_experiment=True \
                          --num_workers=2
 ```
-
-*Output:*
-
-```shell
-INFO:tensorflow:Using model_dir in TF_CONFIG: gs://path/model_dir/
-INFO:tensorflow:Using config: {'_save_checkpoints_secs': 600, '_num_ps_replicas': 1, '_keep_checkpoint_max': 5, '_task_type': u'master', '_is_chief': True, '_cluster_spec': <tensorflow.python.training.server_lib.ClusterSpec object at 0x7fd16fb2be10>, '_model_dir': 'gs://path/model_dir/', '_save_checkpoints_steps': None, '_keep_checkpoint_every_n_hours': 10000, '_session_config': intra_op_parallelism_threads: 1
-gpu_options {
-}
-allow_soft_placement: true
-, '_tf_random_seed': None, '_environment': u'cloud', '_num_worker_replicas': 1, '_task_id': 0, '_save_summary_steps': 100, '_tf_config': gpu_options {
-  per_process_gpu_memory_fraction: 1.0
-}
-, '_evaluation_master': '', '_master': u'grpc://master-ip:8000'}
-...
-2017-08-01 19:59:26.496208: I tensorflow/core/common_runtime/gpu/gpu_device.cc:940] Found device 0 with properties: 
-name: Tesla K80
-major: 3 minor: 7 memoryClockRate (GHz) 0.8235
-pciBusID 0000:00:04.0
-Total memory: 11.17GiB
-Free memory: 11.09GiB
-2017-08-01 19:59:26.775660: I tensorflow/core/common_runtime/gpu/gpu_device.cc:940] Found device 1 with properties: 
-name: Tesla K80
-major: 3 minor: 7 memoryClockRate (GHz) 0.8235
-pciBusID 0000:00:05.0
-Total memory: 11.17GiB
-Free memory: 11.10GiB
-...
-2017-08-01 19:59:29.675171: I tensorflow/core/distributed_runtime/rpc/grpc_server_lib.cc:316] Started server with target: grpc://localhost:8000
-INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1/: (?, 16, 32, 32)
-INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_1/: (?, 16, 32, 32)
-INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_2/: (?, 16, 32, 32)
-INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_3/: (?, 16, 32, 32)
-INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_4/: (?, 16, 32, 32)
-INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_5/: (?, 16, 32, 32)
-INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_6/: (?, 16, 32, 32)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1/avg_pool/: (?, 16, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_1/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_2/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_3/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_4/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_1/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_2/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_3/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_4/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_5/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_6/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1/avg_pool/: (?, 32, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1/: (?, 64, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_1/: (?, 64, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_2/: (?, 64, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_3/: (?, 64, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_4/: (?, 64, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_5/: (?, 64, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_6/: (?, 64, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/global_avg_pool/: (?, 64)
-INFO:tensorflow:image after unit resnet/tower_0/fully_connected/: (?, 11)
-INFO:tensorflow:SyncReplicasV2: replicas_to_aggregate=1; total_num_replicas=1
-INFO:tensorflow:Create CheckpointSaverHook.
-INFO:tensorflow:Restoring parameters from gs://path/model_dir/model.ckpt-0
-2017-08-01 19:59:37.560775: I tensorflow/core/distributed_runtime/master_session.cc:999] Start master session 156fcb55fe6648d6 with config: 
-intra_op_parallelism_threads: 1
-gpu_options {
-  per_process_gpu_memory_fraction: 1
-}
-allow_soft_placement: true
-
-INFO:tensorflow:Saving checkpoints for 1 into gs://path/model_dir/model.ckpt.
-INFO:tensorflow:loss = 1.20682, step = 1
-INFO:tensorflow:loss = 1.20682, learning_rate = 0.1
-INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1/: (?, 16, 32, 32)
-INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_1/: (?, 16, 32, 32)
-INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_2/: (?, 16, 32, 32)
-INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_3/: (?, 16, 32, 32)
-INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_4/: (?, 16, 32, 32)
-INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_5/: (?, 16, 32, 32)
-INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_6/: (?, 16, 32, 32)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1/avg_pool/: (?, 16, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_1/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_2/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_3/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_4/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_5/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_6/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1/avg_pool/: (?, 32, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1/: (?, 64, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_1/: (?, 64, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_2/: (?, 64, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_3/: (?, 64, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_4/: (?, 64, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_5/: (?, 64, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_6/: (?, 64, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/global_avg_pool/: (?, 64)
-INFO:tensorflow:image after unit resnet/tower_0/fully_connected/: (?, 11)
-INFO:tensorflow:SyncReplicasV2: replicas_to_aggregate=2; total_num_replicas=2
-INFO:tensorflow:Starting evaluation at 2017-08-01-20:00:14
-2017-08-01 20:00:15.745881: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1030] Creating TensorFlow device (/gpu:0) -> (device: 0, name: Tesla K80, pci bus id: 0000:00:04.0)
-2017-08-01 20:00:15.745949: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1030] Creating TensorFlow device (/gpu:1) -> (device: 1, name: Tesla K80, pci bus id: 0000:00:05.0)
-2017-08-01 20:00:15.745958: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1030] Creating TensorFlow device (/gpu:2) -> (device: 2, name: Tesla K80, pci bus id: 0000:00:06.0)
-2017-08-01 20:00:15.745964: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1030] Creating TensorFlow device (/gpu:3) -> (device: 3, name: Tesla K80, pci bus id: 0000:00:07.0)
-2017-08-01 20:00:15.745969: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1030] Creating TensorFlow device (/gpu:4) -> (device: 4, name: Tesla K80, pci bus id: 0000:00:08.0)
-2017-08-01 20:00:15.745975: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1030] Creating TensorFlow device (/gpu:5) -> (device: 5, name: Tesla K80, pci bus id: 0000:00:09.0)
-2017-08-01 20:00:15.745987: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1030] Creating TensorFlow device (/gpu:6) -> (device: 6, name: Tesla K80, pci bus id: 0000:00:0a.0)
-2017-08-01 20:00:15.745997: I tensorflow/core/common_runtime/gpu/gpu_device.cc:1030] Creating TensorFlow device (/gpu:7) -> (device: 7, name: Tesla K80, pci bus id: 0000:00:0b.0)
-INFO:tensorflow:Restoring parameters from gs://path/model_dir/model.ckpt-10023
-INFO:tensorflow:Evaluation [1/100]
-INFO:tensorflow:Evaluation [2/100]
-INFO:tensorflow:Evaluation [3/100]
-INFO:tensorflow:Evaluation [4/100]
-INFO:tensorflow:Evaluation [5/100]
-INFO:tensorflow:Evaluation [6/100]
-INFO:tensorflow:Evaluation [7/100]
-INFO:tensorflow:Evaluation [8/100]
-INFO:tensorflow:Evaluation [9/100]
-INFO:tensorflow:Evaluation [10/100]
-INFO:tensorflow:Evaluation [11/100]
-INFO:tensorflow:Evaluation [12/100]
-INFO:tensorflow:Evaluation [13/100]
-...
-INFO:tensorflow:Evaluation [100/100]
-INFO:tensorflow:Finished evaluation at 2017-08-01-20:00:31
-INFO:tensorflow:Saving dict for global step 1: accuracy = 0.0994, global_step = 1, loss = 630.425
-```
-
 #### Worker
 
 ```shell
@@ -487,107 +383,6 @@ $ python cifar10_main.py --data_dir=gs://path/cifar-10-batches-py \
                          --run_experiment=True
 ```
 
-*Output:*
-
-```shell
-INFO:tensorflow:Using model_dir in TF_CONFIG: gs://path/model_dir/
-INFO:tensorflow:Using config: {'_save_checkpoints_secs': 600,
-'_num_ps_replicas': 1, '_keep_checkpoint_max': 5, '_task_type': u'worker',
-'_is_chief': False, '_cluster_spec':
-<tensorflow.python.training.server_lib.ClusterSpec object at 0x7f6918438e10>,
-'_model_dir': 'gs://<path>/model_dir/',
-'_save_checkpoints_steps': None, '_keep_checkpoint_every_n_hours': 10000,
-'_session_config': intra_op_parallelism_threads: 1
-gpu_options {
-}
-allow_soft_placement: true
-, '_tf_random_seed': None, '_environment': u'cloud', '_num_worker_replicas': 1,
-'_task_id': 0, '_save_summary_steps': 100, '_tf_config': gpu_options {
-  per_process_gpu_memory_fraction: 1.0
-  }
-...
-2017-08-01 19:59:26.496208: I tensorflow/core/common_runtime/gpu/gpu_device.cc:940] Found device 0 with properties: 
-name: Tesla K80
-major: 3 minor: 7 memoryClockRate (GHz) 0.8235
-pciBusID 0000:00:04.0
-Total memory: 11.17GiB
-Free memory: 11.09GiB
-2017-08-01 19:59:26.775660: I tensorflow/core/common_runtime/gpu/gpu_device.cc:940] Found device 1 with properties: 
-name: Tesla K80
-major: 3 minor: 7 memoryClockRate (GHz) 0.8235
-pciBusID 0000:00:05.0
-Total memory: 11.17GiB
-Free memory: 11.10GiB
-...
-2017-08-01 19:59:29.675171: I tensorflow/core/distributed_runtime/rpc/grpc_server_lib.cc:316] Started server with target: grpc://localhost:8000
-INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1/: (?, 16, 32, 32)
-INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_1/: (?, 16, 32, 32)
-INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_2/: (?, 16, 32, 32)
-INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_3/: (?, 16, 32, 32)
-INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_4/: (?, 16, 32, 32)
-INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_5/: (?, 16, 32, 32)
-INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_6/: (?, 16, 32, 32)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1/avg_pool/: (?, 16, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_1/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_2/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_3/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_4/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_1/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_2/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_3/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_4/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_5/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_6/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1/avg_pool/: (?, 32, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1/: (?, 64, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_1/: (?, 64, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_2/: (?, 64, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_3/: (?, 64, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_4/: (?, 64, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_5/: (?, 64, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_6/: (?, 64, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/global_avg_pool/: (?, 64)
-INFO:tensorflow:image after unit resnet/tower_0/fully_connected/: (?, 11)
-INFO:tensorflow:SyncReplicasV2: replicas_to_aggregate=2; total_num_replicas=2
-INFO:tensorflow:Create CheckpointSaverHook.
-2017-07-31 22:38:04.629150: I
-tensorflow/core/distributed_runtime/master.cc:209] CreateSession still waiting
-for response from worker: /job:master/replica:0/task:0
-2017-07-31 22:38:09.263492: I
-tensorflow/core/distributed_runtime/master_session.cc:999] Start master
-session cc58f93b1e259b0c with config: 
-intra_op_parallelism_threads: 1
-gpu_options {
-per_process_gpu_memory_fraction: 1
-}
-allow_soft_placement: true
-INFO:tensorflow:loss = 5.82382, step = 0
-INFO:tensorflow:loss = 5.82382, learning_rate = 0.8
-INFO:tensorflow:Average examples/sec: 1116.92 (1116.92), step = 10
-INFO:tensorflow:Average examples/sec: 1233.73 (1377.83), step = 20
-INFO:tensorflow:Average examples/sec: 1485.43 (2509.3), step = 30
-INFO:tensorflow:Average examples/sec: 1680.27 (2770.39), step = 40
-INFO:tensorflow:Average examples/sec: 1825.38 (2788.78), step = 50
-INFO:tensorflow:Average examples/sec: 1929.32 (2697.27), step = 60
-INFO:tensorflow:Average examples/sec: 2015.17 (2749.05), step = 70
-INFO:tensorflow:loss = 37.6272, step = 79 (19.554 sec)
-INFO:tensorflow:loss = 37.6272, learning_rate = 0.8 (19.554 sec)
-INFO:tensorflow:Average examples/sec: 2074.92 (2618.36), step = 80
-INFO:tensorflow:Average examples/sec: 2132.71 (2744.13), step = 90
-INFO:tensorflow:Average examples/sec: 2183.38 (2777.21), step = 100
-INFO:tensorflow:Average examples/sec: 2224.4 (2739.03), step = 110
-INFO:tensorflow:Average examples/sec: 2240.28 (2431.26), step = 120
-INFO:tensorflow:Average examples/sec: 2272.12 (2739.32), step = 130
-INFO:tensorflow:Average examples/sec: 2300.68 (2750.03), step = 140
-INFO:tensorflow:Average examples/sec: 2325.81 (2745.63), step = 150
-INFO:tensorflow:Average examples/sec: 2347.14 (2721.53), step = 160
-INFO:tensorflow:Average examples/sec: 2367.74 (2754.54), step = 170
-INFO:tensorflow:loss = 27.8453, step = 179 (18.893 sec)
-...
-```
-
 #### PS
 
 ```shell
@@ -596,24 +391,6 @@ INFO:tensorflow:loss = 27.8453, step = 179 (18.893 sec)
 $ python cifar10_main.py --run_experiment=True --model_dir=gs://path/model_dir/
 
 # There are more command line flags to play with; check cifar10_main.py for details.
-```
-
-*Output:*
-
-```shell
-INFO:tensorflow:Using model_dir in TF_CONFIG: gs://path/model_dir/
-INFO:tensorflow:Using config: {'_save_checkpoints_secs': 600, '_num_ps_replicas': 1, '_keep_checkpoint_max': 5, '_task_type': u'ps', '_is_chief': False, '_cluster_spec': <tensorflow.python.training.server_lib.ClusterSpec object at 0x7f48f1addf90>, '_model_dir': 'gs://path/model_dir/', '_save_checkpoints_steps': None, '_keep_checkpoint_every_n_hours': 10000, '_session_config': intra_op_parallelism_threads: 1
-gpu_options {
-}
-allow_soft_placement: true
-, '_tf_random_seed': None, '_environment': u'cloud', '_num_worker_replicas': 1, '_task_id': 0, '_save_summary_steps': 100, '_tf_config': gpu_options {
-  per_process_gpu_memory_fraction: 1.0
-}
-, '_evaluation_master': '', '_master': u'grpc://master-ip:8000'}
-2017-07-31 22:54:58.928088: I tensorflow/core/distributed_runtime/rpc/grpc_channel.cc:215] Initialize GrpcChannelCache for job master -> {0 -> master-ip:8000}
-2017-07-31 22:54:58.928153: I tensorflow/core/distributed_runtime/rpc/grpc_channel.cc:215] Initialize GrpcChannelCache for job ps -> {0 -> localhost:8000}
-2017-07-31 22:54:58.928160: I tensorflow/core/distributed_runtime/rpc/grpc_channel.cc:215] Initialize GrpcChannelCache for job worker -> {0 -> worker-ip:8000}
-2017-07-31 22:54:58.929873: I tensorflow/core/distributed_runtime/rpc/grpc_server_lib.cc:316] Started server with target: grpc://localhost:8000
 ```
 
 ## Visualizing results with TensorFlow
