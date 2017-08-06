@@ -211,5 +211,7 @@ AddN: /job:localhost/replica:0/task:0/cpu:0
  [  98.  128.]]
 ```
 
-The @{$deep_cnn$cifar10 tutorial} is a good example
-demonstrating how to do training with multiple GPUs.
+* The @{$deep_cnn$cifar10 tutorial} is a good example
+ demonstrating how to do training with multiple GPUs.
+* The @{$resnet_estimator$guide to multiple GPUs and Distributed TensorFlow with Estimators API}
+  is a good example demonstrating how to do training with multiple GPUs and on distributed settings.
