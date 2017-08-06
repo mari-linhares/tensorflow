@@ -446,8 +446,8 @@ completed the CIFAR-10 tutorial.
   classification system, we recommend forking this tutorial and replacing
   components to address your image classification problem.
 
-* Check the tutorial for a [ResNet with Estimators API #TODO: INSERT LINK]()
-  for CIFAR-10.
+* Check @{$resnet_estimator$A guide to Multi-gpu and Distributed TensorFlow with Estimators API}
+  for a similar implementation using the the Estimators API that also runs on distributed settings.
   
 > **EXERCISE:** Download the
 [Street View House Numbers (SVHN)](http://ufldl.stanford.edu/housenumbers/) data set.
