@@ -149,7 +149,7 @@ we're doing in-graph replication and synchronous training (using gradient averag
 
 When running on distributed settings we're doint between-graph replication and we
 can choose between asynchronous training and synchronous training.
-We recommend to do synchronous training, for this we'll use [tf.train.SyncReplicasOptimizer](https://www.tensorflow.org/api_docs/python/tf/train/SyncReplicasOptimizer)) as the model optimizer.
+We recommend to do synchronous training, for this we'll use [tf.train.SyncReplicasOptimizer](https://www.tensorflow.org/api_docs/python/tf/train/SyncReplicasOptimizer) as the model optimizer.
 
 So in summary we're using between-graph replication for distributed training, 
 and in-graph replication for using multiple GPUs in each worker.
