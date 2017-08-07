@@ -124,7 +124,7 @@ During training, training variable values are updated using aggregated gradients
 In this implementation we're folling the `parameter_server` implementation. More details can be found at
 [performance/performance_models](https://www.tensorflow.org/performance/performance_models#parameter_server_variables).
 
-If run `cifar10_main.py` with the `--is_cpu_ps=True` argument (default) the parameters will be saved on the
+If you run `cifar10_main.py` with the `--is_cpu_ps=True` argument (default) the parameters will be saved on the
 CPU otherwise they will be spread across the available GPUs based on their size, for load balancing.
 
 ### Multiple GPU Implementation
