@@ -6,20 +6,22 @@ and assumes expertise and experience in machine learning.
 ## Introduction
 
 In this guide we'll go through a full code implementation of a ResNet using
-the Estimators API to classify images from CIFAR-10, which is a popular
-dataset for image classification. This model is ready to run on a CPU,
+the Estimators API to classify images from CIFAR-10 dataset. The implementation
+uses TensorFlow best practices for performance and is ready to run on a CPU,
 multiple GPUs, and also multiple hosts.
 
 The focus is not the model itself, the biggest contribution of this guide is
 a practical example of how to build a distributed and multi-gpu model with
-TensorFlow high-level APIs, and what to expect to see as results when doing so.
+TensorFlow high level APIs, and what to expect as result when doing so.
 
 We assume you're already familiar with:
   * [Basic Estimators](https://www.tensorflow.org/extend/estimators)
   * [Distributed Tensorflow concepts](https://www.tensorflow.org/deploy/distributed)
+  * [Using GPUs guide](https://www.tensorflow.org/tutorials/using_gpu)
 
-Also, check to this tutorial section before reading this guide:
+Also is recommended to check these materials:
   * [Training a model using multiple gpu cards](https://www.tensorflow.org/tutorials/deep_cnn#training_a_model_using_multiple_gpu_cards)
+  * [Placing Variables and Operations on Devices](https://www.tensorflow.org/tutorials/deep_cnn#placing_variables_and_operations_on_devices)
 
 ## Dataset and Model Overview
 
@@ -38,12 +40,14 @@ much of TensorFlow's ability to scale to large models. At the same time,
 the model is small enough to train fast, which is ideal for trying out
 new ideas and experimenting with new techniques.
 
-The model will be a ResNet as proposed in:
+The model is a ResNet as proposed in:
 ```
 Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun
 Deep Residual Learning for Image Recognition. arXiv:1512.03385
 ```
 
+This is the default model (some parameters can be easily changed in this
+implementation, as number of layers):
 ```
 INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1/: (?, 16, 32, 32)
 INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_1/: (?, 16, 32, 32)
@@ -77,22 +81,18 @@ INFO:tensorflow:image after unit resnet/tower_0/global_avg_pool/: (?, 64)
 INFO:tensorflow:image after unit resnet/tower_0/fully_connected/: (?, 11)
 ```
 
-### Goals
-
-1. Highlights a canonical organization for network architecture, training and
-   evaluation using the Estimators API.
-2. Provides a template for constructing larger and more sophisticated models.
+[Ask Toby]: Any special reason why resnets?
 
 ### Highlights of the Tutorial
 
 * Complete code implementation that runs on local CPU, GPUs and on multiple hosts;
 * Explanation about how to run distributed TensorFlow using Experiments;
-* Shows how to create your own Hook;
+* Details about how to create your own Hook;
 * Practical example of a input function built with the Dataset API;
 * Shows how to generate TFRecord files;
 
 We hope that this guide provides a launch point for building general models
-with the Estimators API implementing multi-gpu and distributed support.
+with the Estimators API implementing support to multiple GPUs and multiple hosts.
 
 ## Code Organization
 
@@ -106,103 +106,51 @@ File | Purpose
 [`cifar10_model.py`](https://www.tensorflow.org/code/tensorflow_models/tutorials/image/cifar10_estimator/cifar10_model.py) | Builds the ResNet model.
 [`cifar10_main.py`](https://www.tensorflow.org/code/tensorflow_models/tutorials/image/cifar10_estimator/cifar10_main.py) | Trains a CIFAR-10 model on a CPU, GPU, multiple GPUS and even in multiple machines.
 
-## TFRecord
+## The Model Implementation
 
-TensorFlow supports different types of file formats as input: CSV files, Fixed
-length records and Standard TensorFlow format (TFRecords). You can see more
-about it
-[here](https://www.tensorflow.org/programmers_guide/reading_data#reading_from_files).
+### 
 
-The recommended format for TensorFlow is a [TFRecords](https://www.tensorflow.org/api_guides/python/python_io#tfrecords_format_details)
-file. A TFRecords file represents a sequence of (binary) strings. The format
-is not random access, so it is suitable for streaming large amounts of data
-but not suitable if fast sharding or other non-sequential access is desired.
+* https://www.tensorflow.org/performance/performance_models#parameter_server_variables
 
-To create TFRecord files you need to create a
-`[tf.python_io.TFRecordWriter](https://www.tensorflow.org/api_docs/python/tf/python_io/TFRecordWriter)`
-for each file you want to write:
+### Distributed TensorFlow with Experiments
 
+Estimators are scalable and distributed by design. In order to run the model
+on a distributed settings using data-parallelism you can use an Experiment.
+Experiments know how to invoke train and eval in a sensible fashion for
+distributed training.
+
+This is all the code used to create an Experiment at `[cifar10_main.py](https://www.tensorflow.org/code/tensorflow_models/tutorials/image/cifar10_estimator/cifar10_main.p)`.
 ```python
-record_writer = tf.python_io.TFRecordWriter(output_path)
-```
-
-You write a series of `tf.Example` protos to the file. Each example contain
-a dictionary of features. Each feature can be a `FloatList`, `Int64List` or
-`ByteList`.
-
-So, for example, you might encode a single numpy-array image as:
-
-```python
-image_str = image.tostring()
-image_str = tf.train.BytesList(value=[image_str])
-image_str = tf.train.Feature(bytes_list=image_str)
-
-width = tf.train.Int64List(value=[image.shape[0]])
-width = tf.train.Feature(int64_list=width)
-
-height = tf.train.Int64List(value=[image.shape[1]])
-height = tf.train.Feature(int64_list=height)
-
-features = {
-    'height': height,
-    'width': width,
-    'image_str': image_str}
-features = tf.train.Features(feature=features)
-
-example = tf.train.Example(features=features)
-writer.write(example.SerializeToString())
-```
-
-Full examples for popular datasets are available:
-  * CIFAR-10: `[generate_cifar10_tfrecords.py](https://github.com/tensorflow/models/blob/master/tutorials/image/cifar10_estimator/generate_cifar10_tfrecords.py)`
-  * MNIST: `[tensorflow/examples/how_tos/reading_data/fully_connected_reader.py](https://github.com/tensorflow/tensorflow/blob/r1.2/tensorflow/examples/how_tos/reading_data/fully_connected_reader.py)`
-
-## Running Distributed TensorFlow with Estimators
-
-Estimators are a high Level abstraction that support all the basic
-operations you need on a Machine Learning model, they also implement
-best practices, are distributed by design and are ready to be deployed.
-
-In this guide we'll focus on the distributed feature of Estimators.
-
-In other to run the model on a distributed way using
-data-parallelism you can just create an experiment. Experiments know how to
-invoke train and eval in a sensible fashion for distributed training.
-
-```python
-def get_experiment(estimator, train_input, eval_input):
+def get_experiment_fn(train_input_fn, eval_input_fn, train_steps, eval_steps,
+                      train_hooks):
+  """Returns an Experiment function."""
   def _experiment_fn(run_config, hparams):
-    """Creates experiment.
-
-    Experiments perform training on several workers in parallel,
-    in other words Experiments know how to invoke train and eval
-    in a sensible fashion for distributed training.
-
-    We first prepare an estimator, and bundle it
-    together with input functions for training and evaluation
-    then collect all that in an Experiment object.
-    """
-    del run_config, hparams  #unused args
-    return tf.contrib.learn.Experiment(
-        estimator,
-        train_input_fn=train_input,
-        eval_input_fn=eval_input
-    )
+    """Returns an Experiment."""
+    del hparams  # Unused arg.
+    # Create estimator.
+    classifier = tf.estimator.Estimator(model_fn=_resnet_model_fn,
+                                        config=run_config)
+    # Create experiment.
+    experiment = tf.contrib.learn.Experiment(
+        classifier,
+        train_input_fn=train_input_fn,
+        eval_input_fn=eval_input_fn,
+        train_steps=train_steps,
+        eval_steps=eval_steps)
+    # Adding hooks to be used by the estimator on training mode.
+    experiment.extend_train_hooks(train_hooks)
+    return experiment
   return _experiment_fn
-
-# run training and evaluation using an Experiment
-learn_runner.run(get_experiment(estimator, train_input, eval_input),
-                 run_config=run_config)
 ```
 
-### Set TF_CONFIG
+Considering that you already have multiple hosts configured and a Estimator model using Experiments
+you'll only need a `TF_CONFIG` environment variable on each host. You can set up the hosts manually or check [tensorflow/ecosystem](https://github.com/tensorflow/ecosystem) for instructions about how to set up a Cluster.
 
-Considering that you already have multiple hosts configured, all you need is a `TF_CONFIG`
-environment variable on each host. You can set up the hosts manually or check [tensorflow/ecosystem](https://github.com/tensorflow/ecosystem) for instructions about how to set up a Cluster.
+@tobyboyd: link to Google Cloud MLE?
 
 The `TF_CONFIG` will be used by the `RunConfig` to know the existing hosts and their task: `master`, `ps` or `worker`.
 
-Here's an example of `TF_CONFIG`.
+Here's a `TF_CONFIG` example.
 
 ```python
 cluster = {'master': ['master-ip:8000'],
@@ -233,7 +181,7 @@ In this cluster spec we are defining a cluster with 1 master, 1 ps and 1 worker.
 *Task*
 
 The Task defines what is the role of the current node, for this example the node is the master on index 0
-on the cluster spec, the task will be different for each node. An example of the `TF_CONFIG` for a worker would be:
+on the cluster spec, the task will be different for each node. An `TF_CONFIG` example for a worker would be:
 
 ```python
 cluster = {'master': ['master-ip:8000'],
@@ -255,26 +203,60 @@ For a multi host environment you may want to use a Distributed File System, Goog
 
 *Environment*
 
-By the default environment is *local*, for a distributed setting we need to change it to *cloud*.
+By default the environment is *local*, for a distributed setting we need to change it to *cloud*.
 
-### Running script
+## The input pipeline implementation
 
-Once you have a `TF_CONFIG` configured properly on each host you're ready to run on distributed settings.
+We need to implement an input function to feed the features and labels
+(in case of supervisoned learning) to the Estimator. We'll use the
+[Dataset API](https://github.com/tensorflow/tensorflow/blob/master/tensorflow/docs_src/programmers_guide/datasets.md)
+to implement the input function and TFRecords for the file format.
 
-#### Master
+### Generating TFRecords
 
-## Distributed
+A TFRecords file represents a sequence of (binary) strings. The format
+is not random access, so it is suitable for streaming large amounts of data
+but not suitable if fast sharding or other non-sequential access is desired.
 
-* Talk about experiments and how we're running distributed
-* https://stackoverflow.com/questions/41600321/distributed-tensorflow-the-difference-between-in-graph-replication-and-between
-* https://www.tensorflow.org/deploy/distributed
+To generate a TFRecord file you need to create a
+`[tf.python_io.TFRecordWriter](https://www.tensorflow.org/api_docs/python/tf/python_io/TFRecordWriter)`
+for each file you want to write:
 
-### Input function
+```python
+record_writer = tf.python_io.TFRecordWriter(output_path)
+```
 
-The input function will define our input pipeline implementation, and it's
-basically a function that manipulates the data and returns the features and
-labels that will be used by the estimator for training, evaluation, and
-prediction.
+You write a series of `tf.Example` protos to the file. Each example contain
+a dictionary of features. Each feature can be a `FloatList`, `Int64List` or
+`ByteList`.
+
+So, for example, you might encode a single numpy-array image as:
+```python
+image_str = image.tostring()
+image_str = tf.train.BytesList(value=[image_str])
+image_str = tf.train.Feature(bytes_list=image_str)
+
+width = tf.train.Int64List(value=[image.shape[0]])
+width = tf.train.Feature(int64_list=width)
+
+height = tf.train.Int64List(value=[image.shape[1]])
+height = tf.train.Feature(int64_list=height)
+
+features = {
+    'height': height,
+    'width': width,
+    'image_str': image_str}
+features = tf.train.Features(feature=features)
+
+example = tf.train.Example(features=features)
+writer.write(example.SerializeToString())
+```
+
+Full examples for popular datasets are available:
+  * CIFAR-10: `[generate_cifar10_tfrecords.py](https://github.com/tensorflow/models/blob/master/tutorials/image/cifar10_estimator/generate_cifar10_tfrecords.py)`
+  * MNIST: `[tensorflow/examples/how_tos/reading_data/fully_connected_reader.py](https://github.com/tensorflow/tensorflow/blob/r1.2/tensorflow/examples/how_tos/reading_data/fully_connected_reader.py)`
+
+### The Dataset API
 
 An efficient and scalable way to implement your own input function is to use the
 [Dataset API](https://github.com/tensorflow/tensorflow/blob/master/tensorflow/docs_src/programmers_guide/datasets.md).
@@ -283,8 +265,9 @@ The Dataset API enables you to build complex input pipelines from simple,
 reusable pieces, making it easy to deal with large amounts of data, different
 data formats, and complicated transformations.
 
-Here's an input function implementation using the Dataset API to read a
-TFRecord file.
+Here is the core of the input function defined at
+`[cifar10.py](https://www.tensorflow.org/code/tensorflow_models/tutorials/image/cifar10_estimator/cifar10.py)`
+using the Dataset API to read from a TFRecord file.
 
 ```python
 # Gets TFRecord from disk and repeats dataset undefinitely.
@@ -328,6 +311,99 @@ and **iterators**.
 * A Iterator provides the main way to extract elements from a dataset.
   The Iterator.get_next() operation yields the next element of a Dataset, and
   typically acts as the interface between input pipeline code and your model.
+
+## Running and checking results
+
+For this quick experiment we trained the model on local settings with 1, 2, 4 and 8 GPUs in the same host,
+and on distributed settings with 1 master with 4 gpus, 1 worker with 4 gpus and 1 ps with 1 CPU.
+
+We've trained the model 3 times for each configuration, and a batch size per gpu equals to
+128.
+
+### Images/sec
+
+We should expect an almost linear increase in the images/sec as we add more gpus (increase the batch size),
+the reason why this may not be linear is that the model is not big enough to have a big improvement from
+using a lot of GPUs.
+
+* @monteirom: add images/sec graph
+
+### Accuracy
+
+It's important to make sure we're still getting the same accuracy while adding more GPUs. This may need
+some hyperparameter tuning since we're increasing the batch size accordingly to the number GPUs.
+We didn't try to tune the model, instead we increased the learning rate accordingly to the batch size
+(number of gpus) since larger mini-batches reduces the variance of your stochastic gradient
+updates (considering that we're averaging the gradients in the mini-batch), and this allows
+bigger step sizes.
+
+* @monteirom: add accuracy graph
+* @tobyboyd: any papers to point to about this?
+
+> **EXERCISE**: Change the hyperparameters to see how that affects the model.
+
+An example why changing hyperparameters is important is that we tried to run this model with
+initial learning rate of 0.1 with 8 gpus, and the maximum accuracy we got, in 3 runs, was about 90%,
+against 91% with initial learning rate of 0.8. This may not seem a lot, but these small tunings can make a
+big difference while scaling your model.
+
+### Global_step/sec
+
+We should expect to see basically the same `global_step/sec` for each execution and slightly small values
+when adding more gpus because of the overhead of dealing with multiple devices/hosts.
+
+* @monteirom: add global_step/sec graph
+
+Even though we're getting the same (or smaller) `global_step/sec` we still train faster since we're decreasing
+the number of train steps because we have more devices training in parallel, which allows faster convergence.
+
+* @monteirom: add relative graph
+
+> **EXERCISE**: Run this model with a constant batch size and with different number of GPUs
+(e.g. 1, 2 and 4 gpus) you should see an increase on the global_step/sec as you add GPUs.
+This also means the model should train faster as you add GPUs. This approach is not as
+scalable as defining a constant batch size per GPU.
+
+### Running the experiment
+
+For local settings:
+
+```python
+
+@monteirom: add commands
+
+```
+
+For distributed settings:
+
+```python
+
+@monteirom: add commands
+
+```
+
+### About the environment
+
+For local training we used the following environment on Google Comput Engine:
+
+* @monteirom: Insert environment
+
+For local training we used the following environment on Google Comput Engine:
+
+* @monteirom: Insert environment
+
+
+### Running Distributed
+
+
+
+#### Set TF_CONFIG
+
+## Distributed
+
+* Talk about experiments and how we're running distributed
+* https://stackoverflow.com/questions/41600321/distributed-tensorflow-the-difference-between-in-graph-replication-and-between
+* https://www.tensorflow.org/deploy/distributed
 
 ## Training and Evaluation in a Distributed Environment
 
