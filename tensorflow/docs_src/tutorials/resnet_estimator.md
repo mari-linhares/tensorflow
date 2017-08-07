@@ -403,15 +403,15 @@ and this allows bigger step sizes.
 
 > **EXERCISE**: Play with the hyperparameters trying to tune the model.
 
-* @monteirom: update the values here;
+* @monteirom: verify these values;
 An example why changing hyperparameters is important is that we tried to run this model with
-initial learning rate of 0.1 with 8 gpus, and the maximum accuracy we got was about 90%,
-against 91% with initial learning rate of 0.8. This may not seem a lot, but these small tunings can make a
-big difference while scaling your model.
+initial learning rate of 0.1 with 8 gpus and weight decay of 1e-4, and the maximum accuracy we
+got was about 85%, against 91% with initial learning rate of 0.8 and weight decay of 2e-4.
+These small tunings can make a big difference while scaling your model.
 
 ### Global_step/sec
 
-We should expect to see basically the same `global_step/sec` for each execution and slightly
+We should expect to see similar `global_step/sec` for each execution and slightly
 smaller values when adding more gpus because of the overhead of dealing with multiple devices/hosts.
 
 * @monteirom: add global_step/sec graph
@@ -436,17 +436,77 @@ get very small for each GPU.
 For local settings:
 
 ```python
+# 1 GPU
+python cifar10_main.py --data_dir=gs://path/to/cifar10/tfrecords \
+                       --num_gpus=1 \
+                       --train_batch_size=128 \
+                       --model_dir=/tmp/1gpu \
+                       --train_steps=80000 \
+                       --run_experiment=True \
+                       --learning_rate=0.1 \
+                       --eval_batch_size=200
+# 2 GPUs
+python cifar10_main.py --data_dir=gs://path/to/cifar10/tfrecords \
+                       --num_gpus=2 \
+                       --train_batch_size=256 \
+                       --model_dir=/tmp/2gpus \
+                       --train_steps=40000 \
+                       --run_experiment=True \
+                       --learning_rate=0.1 \
+                       --eval_batch_size=200
 
-@monteirom: add commands
+# 4 GPUs
+python cifar10_main.py --data_dir=gs://path/to/cifar10/tfrecords \
+                       --num_gpus=4 \
+                       --train_batch_size=512 \
+                       --model_dir=/tmp/4gpus \
+                       --train_steps=20000 \
+                       --run_experiment=True \
+                       --learning_rate=0.5 \
+                       --eval_batch_size=200
 
+# 8 GPUs
+python cifar10_main.py --data_dir=gs://path/to/cifar10/tfrecords \
+                       --num_gpus=8 \
+                       --train_batch_size=1024 \
+                       --model_dir=/tmp/8gpus \
+                       --train_steps=10000 \
+                       --run_experiment=True \
+                       --learning_rate=0.8 \
+                       --eval_batch_size=200
 ```
 
 For distributed settings:
-
 ```python
+# Master
+TF_CONFIG='{"environment": "cloud", "cluster": {"master": ["master-ip:8000"], "ps": ["ps-ip:8000"], "master": ["worker-ip:8000"]}, "task": {"index": 0, "type": "master"}, "model_dir": "gs://path/to/model_dir"}' \
+python cifar10_main.py --data_dir=gs://path/to/cifar10/tfrecords \
+                       --num_gpus=4 \
+                       --train_batch_size=512 \
+                       --model_dir=gs://path/to/model_dir \
+                       --sync=True \
+                       --train_steps=10000 \
+                       --run_experiment=True \
+                       --learning_rate=0.8 \
+                       --eval_batch_size=200 \
+                       --num_workers=2
 
-@monteirom: add commands
+# Worker
+TF_CONFIG='{"environment": "cloud", "cluster": {"master": ["master-ip:8000"], "ps": ["ps-ip:8000"], "master": ["worker-ip:8000"]}, "task": {"index": 0, "type": "worker"}, "model_dir": "gs://path/to/model_dir"}' \
+python cifar10_main.py --data_dir=gs://path/to/cifar10/tfrecords \
+                       --num_gpus=4 \
+                       --train_batch_size=512 \
+                       --model_dir=gs://path/to/model_dir \
+                       --sync=True \
+                       --train_steps=10000 \
+                       --run_experiment=True \
+                       --learning_rate=0.8 \
+                       --eval_batch_size=200 \
+                       --num_workers=2
 
+# PS
+TF_CONFIG='{"environment": "cloud", "cluster": {"master": ["master-ip:8000"], "ps": ["ps-ip:8000"], "master": ["worker-ip:8000"]}, "task": {"index": 0, "type": "worker"}, "model_dir": "gs://path/to/model_dir"}' \
+python cifar10_main.py --model_dir=gs://path/to/model_dir --run_experiment=True
 ```
 
 ### About the Environment
