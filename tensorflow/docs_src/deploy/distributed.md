@@ -180,7 +180,7 @@ simplify the work of specifying a replicated model. Possible approaches include:
   gradient averaging as in the
   [CIFAR-10 multi-GPU trainer](https://github.com/tensorflow/models/tree/master/tutorials/image/cifar10/cifar10_multi_gpu_train.py)),
   and between-graph replication (e.g. using the
-  @{tf.train.SyncReplicasOptimizer}).
+  @{tf.train.SyncReplicasOptimizer} as in the @{$resnet_estimator$guide to multiple GPUs and Distributed TensorFlow with Estimators API}).
 
 ### Putting it all together: example trainer program
 
