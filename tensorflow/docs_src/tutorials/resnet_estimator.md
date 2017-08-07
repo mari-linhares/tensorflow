@@ -511,13 +511,29 @@ python cifar10_main.py --model_dir=gs://path/to/model_dir --run_experiment=True
 
 ### About the Environment
 
-For local training we used the following environment on Google Comput Engine:
+For local training we used the following environment on Google Compute Engine:
 
-* @monteirom: Insert environment
+* Machine type: n1-standard-32 (32 vCPUs, 120 GB memory)
+* CPU platform: Intel Haswell
+* GPUs: 8 x NVIDIA Tesla K80
+* OS: Ubuntu 16.04 LTS
+* CUDA / cuDNN: 8.0 / 6.0 (@tobyboyd: how to check CUDA version?)
 
-For local training we used the following environment on Google Comput Engine:
+For distributed training we used the following environment on Google Compute Engine:
 
-* @monteirom: Insert environment
+For the Master and Worker:
+
+* Machine type: n1-standard-32 (32 vCPUs, 120 GB memory)
+* CPU platform: Intel Haswell
+* GPUs: 8 x NVIDIA Tesla K80
+* OS: Ubuntu 16.04 LTS
+* CUDA / cuDNN: 8.0 / 6.0 (@tobyboyd: how to check CUDA version?)
+
+For the PS:
+
+* Machine type: n1-standard-16 (16 vCPUs, 60 GB memory)
+* CPU platform: Intel Haswell
+* OS: Ubuntu 16.04 LTS
 
 ### Methodology
 
