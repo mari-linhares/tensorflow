@@ -273,7 +273,7 @@ is not random access, so it is suitable for streaming large amounts of data
 but not suitable if fast sharding or other non-sequential access is desired.
 
 To generate a TFRecord file you need to create a
-`[tf.python_io.TFRecordWriter](https://www.tensorflow.org/api_docs/python/tf/python_io/TFRecordWriter)`
+[`tf.python_io.TFRecordWriter`](https://www.tensorflow.org/api_docs/python/tf/python_io/TFRecordWriter)
 for each file you want to write:
 
 ```python
@@ -307,8 +307,8 @@ writer.write(example.SerializeToString())
 ```
 
 Full examples for popular datasets are available:
-  * CIFAR-10: `[generate_cifar10_tfrecords.py](https://github.com/tensorflow/models/blob/master/tutorials/image/cifar10_estimator/generate_cifar10_tfrecords.py)`
-  * MNIST: `[tensorflow/examples/how_tos/reading_data/fully_connected_reader.py](https://github.com/tensorflow/tensorflow/blob/r1.2/tensorflow/examples/how_tos/reading_data/fully_connected_reader.py)`
+  * CIFAR-10: [`generate_cifar10_tfrecords.py`](https://github.com/tensorflow/models/blob/master/tutorials/image/cifar10_estimator/generate_cifar10_tfrecords.py)
+  * MNIST: [`tensorflow/examples/how_tos/reading_data/fully_connected_reader.py`](https://github.com/tensorflow/tensorflow/blob/r1.2/tensorflow/examples/how_tos/reading_data/fully_connected_reader.py)
 
 ### The Dataset API
 
@@ -320,7 +320,7 @@ reusable pieces, making it easy to deal with large amounts of data, different
 data formats, and complicated transformations.
 
 Here is the core of the input function defined at
-`[cifar10.py](https://www.tensorflow.org/code/tensorflow_models/tutorials/image/cifar10_estimator/cifar10.py)`
+[`cifar10.py`](https://www.tensorflow.org/code/tensorflow_models/tutorials/image/cifar10_estimator/cifar10.py)
 using the Dataset API to read from a TFRecord file.
 
 ```python
@@ -366,60 +366,72 @@ and **iterators**.
   The Iterator.get_next() operation yields the next element of a Dataset, and
   typically acts as the interface between input pipeline code and your model.
 
-## Running and checking results
+## Running and Checking Results
 
-For this quick experiment we trained the model on local settings with 1, 2, 4 and 8 GPUs in the same host,
-and on distributed settings with 1 master with 4 gpus, 1 worker with 4 gpus and 1 ps with 1 CPU.
+Here we'll discuss a quick experiment running this model with multiple GPUs on a local and distributed
+environment. In order to show what to expect to see when running your models on similar settings.
 
-We've trained the model 3 times for each configuration, and a batch size per gpu equals to
-128.
+We've trained the model on locally with 1, 2, 4 and 8 GPUs, and on distributed settings
+with 1 master with 4 gpus, 1 worker with 4 gpus and 1 ps with 1 CPU manually configured using
+only a `TF_CONFIG` to do this.
+
+We defined the batch size as a contast value of 128 per gpu, which means that if we're using
+4 GPUs, per example, the total batch size will actually be 512.
 
 ### Images/sec
 
-We should expect an almost linear increase in the images/sec as we add more gpus (increase the batch size),
-the reason why this may not be linear is that the model is not big enough to have a big improvement from
-using a lot of GPUs.
+We should expect an almost linear increase in the *images/sec* metric as we add more gpus
+since we're increasing the batch size along with the number of GPUs used, and the reason
+why this may not be linear is that the model is probably not big enough to have a big
+improvement from using a lot of GPUs.
 
 * @monteirom: add images/sec graph
 
+> **EXERCISE**: Add more layers to the model and see if you get closer to a linear increase along with
+the number of GPUs.
+
 ### Accuracy
 
-It's important to make sure we're still getting the same accuracy while adding more GPUs. This may need
-some hyperparameter tuning since we're increasing the batch size accordingly to the number GPUs.
-We didn't try to tune the model, instead we increased the learning rate accordingly to the batch size
-(number of gpus) since larger mini-batches reduces the variance of your stochastic gradient
-updates (considering that we're averaging the gradients in the mini-batch), and this allows
-bigger step sizes.
+It's important to make sure we're still getting the approximately same accuracy while adding more GPUs.
+This may need some hyperparameter tuning, we didn't try to tune the model, instead we increased the
+learning rate accordingly to the batch size (number of gpus) since larger mini-batches reduces the
+variance of your stochastic gradient updates (considering that we're averaging the gradients in the mini-batch),
+and this allows bigger step sizes.
 
 * @monteirom: add accuracy graph
 * @tobyboyd: any papers to point to about this?
 
-> **EXERCISE**: Change the hyperparameters to see how that affects the model.
+> **EXERCISE**: Play with the hyperparameters trying to tune the model.
 
+* @monteirom: update the values here;
 An example why changing hyperparameters is important is that we tried to run this model with
-initial learning rate of 0.1 with 8 gpus, and the maximum accuracy we got, in 3 runs, was about 90%,
+initial learning rate of 0.1 with 8 gpus, and the maximum accuracy we got was about 90%,
 against 91% with initial learning rate of 0.8. This may not seem a lot, but these small tunings can make a
 big difference while scaling your model.
 
 ### Global_step/sec
 
-We should expect to see basically the same `global_step/sec` for each execution and slightly small values
-when adding more gpus because of the overhead of dealing with multiple devices/hosts.
+We should expect to see basically the same `global_step/sec` for each execution and slightly
+smaller values when adding more gpus because of the overhead of dealing with multiple devices/hosts.
 
 * @monteirom: add global_step/sec graph
 
-Even though we're getting the same (or smaller) `global_step/sec` we still train faster since we're decreasing
-the number of train steps because we have more devices training in parallel, which allows faster convergence.
+Even though we're getting the same (or smaller) `global_step/sec` we still train faster because
+we can decrease the number of train steps as we increase the number of GPUs / batch size,
+because we have more devices training in parallel, but as said before we should still see
+similar accuracy.
 
 * @monteirom: add relative graph
 
 > **EXERCISE**: Run this model with a constant batch size and with different number of GPUs
-(e.g. 1, 2 and 4 gpus) you should see an increase on the global_step/sec as you add GPUs.
+(e.g. 1, 2 and 4 gpus) you should the global_step/sec increaseing as you add GPUs.
 This also means the model should train faster as you add GPUs. This approach is not as
-scalable as defining a constant batch size per GPU.
+scalable as defining a constant batch size per GPU since at some point the batch size will
+get very small for each GPU.
 
+* @tobyboyd: find someone to help us do this section more technical?
 
-### Running the experiment
+### Reproducing this Experiment
 
 For local settings:
 
@@ -437,7 +449,7 @@ For distributed settings:
 
 ```
 
-### About the environment
+### About the Environment
 
 For local training we used the following environment on Google Comput Engine:
 
@@ -446,10 +458,21 @@ For local training we used the following environment on Google Comput Engine:
 For local training we used the following environment on Google Comput Engine:
 
 * @monteirom: Insert environment
+
+### Methodology
+
+In order to create results that are as repeatable as possible, even though this is not a benchmark,
+each test was run 3 times and then the times were averaged together for the *images/sec* metric,
+for the accuracy graph we used the best accuracy we found while training, and for the
+*global_step/sec* accuracy all 3 runs got very similar graphs over time, so we picked the runs
+that had the best accuracy as well. GPUs are run in their default state on the given platform.
+For NVIDIA® Tesla® K80 this means leaving on [GPU
+Boost](https://devblogs.nvidia.com/parallelforall/increase-performance-gpu-boost-k80-autoboost/).
 
 ## Visualizing results with TensorFlow
 
-When using Estimators you can also visualize your data in TensorBoard.
+When using Estimators you can also visualize your data in TensorBoard, and that's what we did
+for the accuracy and *global_step/sec* graphs available in this guide.
 
 ```shell
 # Check TensorBoard during training or after it.
