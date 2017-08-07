@@ -81,7 +81,7 @@ INFO:tensorflow:image after unit resnet/tower_0/global_avg_pool/: (?, 64)
 INFO:tensorflow:image after unit resnet/tower_0/fully_connected/: (?, 11)
 ```
 
-[Ask Toby]: Any special reason why resnets?
+[Ask Toby]: Any special reason why resnets? And Maybe a diagram here?
 
 ### Highlights of the Tutorial
 
@@ -89,7 +89,7 @@ INFO:tensorflow:image after unit resnet/tower_0/fully_connected/: (?, 11)
 * Explanation about how to run distributed TensorFlow using Experiments;
 * Details about how to create your own Hook;
 * Practical example of a input function built with the Dataset API;
-* Shows how to generate TFRecord files;
+* Shows how to generate TFRecord files.
 
 We hope that this guide provides a launch point for building general models
 with the Estimators API implementing support to multiple GPUs and multiple hosts.
@@ -108,9 +108,56 @@ File | Purpose
 
 ## The Model Implementation
 
-### 
+Here we'll mention some specific details about the implementation that we think
+is worth sharing.
 
-* https://www.tensorflow.org/performance/performance_models#parameter_server_variables
+Before reading the following subsections check the arguments available for
+[`cifar10_main.py`](https://www.tensorflow.org/code/tensorflow_models/tutorials/image/cifar10_estimator/cifar10_main.py)
+described in the beginning of the file.
+
+### Variable Distribution and Gradient Aggregation
+
+During training, training variable values are updated using aggregated gradients and deltas.
+In this implementation we're folling the `parameter_server` implementation. More details can be found at
+[performance/performance_models](https://www.tensorflow.org/performance/performance_models#parameter_server_variables).
+
+If run `cifar10_main.py` with the `--is_cpu_ps=True` argument (default) the parameters will be saved on the
+CPU otherwise they will be spread across the available GPUs based on their size, for load balancing.
+
+### Multiple GPU Implementation
+
+The implementation is basically the same described at
+[Training a model using multiple gpu cards](https://www.tensorflow.org/tutorials/deep_cnn#training_a_model_using_multiple_gpu_cards).
+
+Here is a diagram of this model:
+
+<div style="width:40%; margin:auto; margin-bottom:10px; margin-top:20px;">
+  <img style="width:100%" src="https://www.tensorflow.org/images/Parallelism.png">
+</div>
+
+One important difference is that in the implementation presented here we can spread
+the parameters across the available GPUs as described in the previous subsection,
+in this case the gradients will be everaged and updated at the `/gpu:0`.
+
+### Distributed Settings Terminology
+
+First of all is important to notice that when runing locally with multiple GPUs
+we're doing in-graph replication and synchronous training (using gradient averaging).
+
+When running on distributed settings we're doint between-graph replication and we
+can choose between asynchronous training and synchronous training.
+We recomment to do synchronous training when running distributed, for this run the code
+with the `--sync=True` argument that will use [tf.train.SyncReplicasOptimizer](https://www.tensorflow.org/api_docs/python/tf/train/SyncReplicasOptimizer)) as the optimizer.
+
+So in summary we're using between-graph replication for distributed training, 
+and in-graph replication for using multiple GPUs in each worker.
+
+Read [deploy/distributed/replicated_training](https://www.tensorflow.org/deploy/distributed#replicated_training)
+for details about the terminology used.
+
+### Building a Custom Hook
+
+* @tobyboyd: add some comments about how to do it?
 
 ### Distributed TensorFlow with Experiments
 
@@ -148,7 +195,8 @@ you'll only need a `TF_CONFIG` environment variable on each host. You can set up
 
 @tobyboyd: link to Google Cloud MLE?
 
-The `TF_CONFIG` will be used by the `RunConfig` to know the existing hosts and their task: `master`, `ps` or `worker`.
+The `TF_CONFIG` will be used by the [`RunConfig`](https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/learn/python/learn/estimators/run_config.py)
+to know the existing hosts and their task: `master`, `ps` or `worker`.
 
 Here's a `TF_CONFIG` example.
 
@@ -171,7 +219,8 @@ A cluster spec, which is basically a dictionary that describes all of the tasks 
 
 In this cluster spec we are defining a cluster with 1 master, 1 ps and 1 worker.
 
-* `ps`: saves the parameters among all workers. All workers can read/write/update the parameters for model via ps.
+* `ps`: stands for Parameter Server, it saves the parameters among all workers.
+        All workers can read/write/update the parameters for model via ps.
         As some models are extremely large the parameters are shared among the ps (each ps stores a subset).
 
 * `worker`: does the training.
@@ -364,6 +413,7 @@ the number of train steps because we have more devices training in parallel, whi
 This also means the model should train faster as you add GPUs. This approach is not as
 scalable as defining a constant batch size per GPU.
 
+
 ### Running the experiment
 
 For local settings:
@@ -392,94 +442,12 @@ For local training we used the following environment on Google Comput Engine:
 
 * @monteirom: Insert environment
 
-
-### Running Distributed
-
-
-
-#### Set TF_CONFIG
-
-## Distributed
-
-* Talk about experiments and how we're running distributed
-* https://stackoverflow.com/questions/41600321/distributed-tensorflow-the-difference-between-in-graph-replication-and-between
-* https://www.tensorflow.org/deploy/distributed
-
-## Training and Evaluation in a Distributed Environment
-
-Another great thing about Estimators is that they are built to be easily
-distributed. 
-Below is the code to create and run an experiment.
-
-### Visualizing results with TensorFlow
-
-When using Estimators you can also visualize your data in TensorBoard, with no changes in your code. You can use TensorBoard to visualize your TensorFlow graph, plot quantitative metrics about the execution of your graph, and show additional data like images that pass through it.
-
-You'll see something similar to this if you "point" TensorBoard to the `model_dir` you used to train or evaluate your model.
-
-```shell
-# Check TensorBoard during training or after it.
-# Just point TensorBoard to the model_dir you chose on the previous step
-# by default the model_dir is "sentiment_analysis_output"
-$ tensorboard --log_dir="sentiment_analysis_output"
-```
-## What to expect
-
-* Results table
-
-```shell
-# Run this on master:
-# Runs an Experiment in sync mode on 4 GPUs using CPU as parameter server for 40000 steps.
-# It will run evaluation a couple of times during training.
-# The num_workers arugument is used only to update the learning rate correctly.
-# Make sure the model_dir is the same as defined on the TF_CONFIG.
-$ python cifar10_main.py --data_dir=gs://path/cifar-10-batches-py \
-                         --model_dir=gs://path/model_dir/ \
-                         --is_cpu_ps=True \
-                         --force_gpu_compatible=True \
-                         --num_gpus=4 \
-                         --train_steps=40000 \
-                         --sync=True \
-                         --run_experiment=True \
-                         --num_workers=2
-```
-#### Worker
-
-```shell
-# Run this on worker:
-# Runs an Experiment in sync mode on 4 GPUs using CPU as parameter server for 40000 steps.
-# It will run evaluation a couple of times during training.
-# Make sure the model_dir is the same as defined on the TF_CONFIG.
-$ python cifar10_main.py --data_dir=gs://path/cifar-10-batches-py \
-                         --model_dir=gs://path/model_dir/ \
-                         --is_cpu_ps=True \
-                         --force_gpu_compatible=True \
-                         --num_gpus=4 \
-                         --train_steps=40000 \
-                         --sync=True
-                         --run_experiment=True
-```
-
-#### PS
-
-```shell
-# Run this on ps:
-# The ps will not do training so most of the arguments won't affect the execution
-$ python cifar10_main.py --run_experiment=True --model_dir=gs://path/model_dir/
-
-# There are more command line flags to play with; check cifar10_main.py for details.
-```
-
 ## Visualizing results with TensorFlow
 
-When using Estimators you can also visualize your data in TensorBoard, with no changes in your code. You can use TensorBoard to visualize your TensorFlow graph, plot quantitative metrics about the execution of your graph, and show additional data like images that pass through it.
-
-You'll see something similar to this if you "point" TensorBoard to the `model_dir` you used to train or evaluate your model.
+When using Estimators you can also visualize your data in TensorBoard.
 
 ```shell
 # Check TensorBoard during training or after it.
-# Just point TensorBoard to the model_dir you chose on the previous step
-# by default the model_dir is "sentiment_analysis_output"
-$ tensorboard --log_dir="sentiment_analysis_output"
+# Just point TensorBoard to the model_dir you chose.
+$ tensorboard --log_dir="path/to/model_dir"
 ```
-
