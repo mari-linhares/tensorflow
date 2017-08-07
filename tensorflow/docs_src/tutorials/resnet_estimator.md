@@ -168,7 +168,8 @@ on a distributed settings using data-parallelism you can use an Experiment.
 Experiments know how to invoke train and eval in a sensible fashion for
 distributed training.
 
-This is all the code used to create an Experiment at `[cifar10_main.py](https://www.tensorflow.org/code/tensorflow_models/tutorials/image/cifar10_estimator/cifar10_main.p)`.
+This is all the code used to create an Experiment at
+[`cifar10_main.py`](https://www.tensorflow.org/code/tensorflow_models/tutorials/image/cifar10_estimator/cifar10_main.p).
 ```python
 def get_experiment_fn(train_input_fn, eval_input_fn, train_steps, eval_steps,
                       train_hooks):
