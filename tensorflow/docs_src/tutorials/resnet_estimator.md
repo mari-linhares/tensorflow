@@ -435,7 +435,7 @@ get very small for each GPU.
 
 For local settings:
 
-```python
+```shell
 # 1 GPU
 python cifar10_main.py --data_dir=gs://path/to/cifar10/tfrecords \
                        --num_gpus=1 \
@@ -477,7 +477,7 @@ python cifar10_main.py --data_dir=gs://path/to/cifar10/tfrecords \
 ```
 
 For distributed settings:
-```python
+```shell
 # Master
 TF_CONFIG='{"environment": "cloud", "cluster": {"master": ["master-ip:8000"], "ps": ["ps-ip:8000"], "master": ["worker-ip:8000"]}, "task": {"index": 0, "type": "master"}, "model_dir": "gs://path/to/model_dir"}' \
 python cifar10_main.py --data_dir=gs://path/to/cifar10/tfrecords \
