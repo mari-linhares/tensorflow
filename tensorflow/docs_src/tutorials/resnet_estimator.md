@@ -11,8 +11,9 @@ uses TensorFlow best practices for performance and is ready to run on a CPU,
 multiple GPUs, and also multiple hosts.
 
 The focus is not the model itself, the biggest contribution of this guide is
-a practical example of how to build a distributed and multi-gpu model with
-TensorFlow high level APIs, and what to expect as result when doing so.
+a practical example of how to build a model that can run on multiple GPUs and
+also on multiple hosts using the TensorFlow high level APIs, and what to expect
+when doing so.
 
 We assume you're already familiar with:
   * [Basic Estimators](https://www.tensorflow.org/extend/estimators)
@@ -81,7 +82,7 @@ INFO:tensorflow:image after unit resnet/tower_0/global_avg_pool/: (?, 64)
 INFO:tensorflow:image after unit resnet/tower_0/fully_connected/: (?, 11)
 ```
 
-[Ask Toby]: Any special reason why resnets? And Maybe a diagram here?
+* @tobyboyd: Any special reason why resnets? And Maybe a diagram here?
 
 ### Highlights of the Tutorial
 
