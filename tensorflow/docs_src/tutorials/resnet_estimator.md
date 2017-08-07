@@ -193,8 +193,10 @@ def get_experiment_fn(train_input_fn, eval_input_fn, train_steps, eval_steps,
   return _experiment_fn
 ```
 
-Considering that you already have multiple hosts configured and a Estimator model using Experiments
-you'll only need a `TF_CONFIG` environment variable on each host. You can set up the hosts manually or check [tensorflow/ecosystem](https://github.com/tensorflow/ecosystem) for instructions about how to set up a Cluster.
+Considering that you already have multiple hosts configured and an Estimator model using Experiments
+you'll only need a `TF_CONFIG` environment variable setted up properly on each host.
+You can set up the hosts manually or check [tensorflow/ecosystem](https://github.com/tensorflow/ecosystem)
+for instructions about how to set up a Cluster.
 
 @tobyboyd: link to Google Cloud MLE?
 
@@ -232,8 +234,8 @@ In this cluster spec we are defining a cluster with 1 master, 1 ps and 1 worker.
 
 *Task*
 
-The Task defines what is the role of the current node, for this example the node is the master on index 0
-on the cluster spec, the task will be different for each node. An `TF_CONFIG` example for a worker would be:
+The Task defines what is the role of the current node, for the previous example the node is the master on index 0
+of the cluster spec, the task will be different for each node. An `TF_CONFIG` example for a worker would be:
 
 ```python
 cluster = {'master': ['master-ip:8000'],
