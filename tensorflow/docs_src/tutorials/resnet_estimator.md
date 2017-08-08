@@ -480,7 +480,7 @@ For local training we used the following environment on Google Compute Engine:
 * **CPU platform**: Intel Haswell
 * **GPUs**: 8 x NVIDIA Tesla K80
 * **OS**: Ubuntu 16.04 LTS
-* **CUDA / cuDNN**: 8.0 / 6.0 (@tobyboyd: how to check CUDA version?)
+* **CUDA / cuDNN**: 8.0 / 6.0
 
 For distributed training we used the following environment on Google Compute Engine:
 
@@ -490,7 +490,7 @@ For the Master and Worker:
 * **CPU platform**: Intel Haswell
 * **GPUs**: 8 x NVIDIA Tesla K80
 * **OS**: Ubuntu 16.04 LTS
-* **CUDA / cuDNN**: 8.0 / 6.0 (@tobyboyd: how to check CUDA version?)
+* **CUDA / cuDNN**: 8.0 / 6.0
 
 For the PS:
 
