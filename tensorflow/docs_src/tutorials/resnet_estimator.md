@@ -5,15 +5,15 @@ and assumes expertise and experience in machine learning.
 
 ## Introduction
 
-In this guide we'll go through a full code implementation of a ResNet using
+In this guide we'll go through a full implementation of a ResNet using
 the Estimators API to classify images from CIFAR-10 dataset. The implementation
 uses TensorFlow best practices for performance and is ready to run on a CPU,
 multiple GPUs, and also multiple hosts.
 
 The focus is not the model itself, the biggest contribution of this guide is
 a practical example of how to build a model that can run on multiple GPUs and
-also on multiple hosts using the TensorFlow high level APIs, and what to expect
-when doing so.
+also on multiple hosts using the TensorFlow high level APIs, and a short demo
+that shows some of what to expect when doing so.
 
 We assume you're already familiar with:
   * [Basic Estimators](https://www.tensorflow.org/extend/estimators)
@@ -47,50 +47,13 @@ Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun
 Deep Residual Learning for Image Recognition. arXiv:1512.03385
 ```
 
-This is the default model (some parameters can be easily changed in this
-implementation, as number of layers):
-```
-INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1/: (?, 16, 32, 32)
-INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_1/: (?, 16, 32, 32)
-INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_2/: (?, 16, 32, 32)
-INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_3/: (?, 16, 32, 32)
-INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_4/: (?, 16, 32, 32)
-INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_5/: (?, 16, 32, 32)
-INFO:tensorflow:image after unit resnet/tower_0/stage/residual_v1_6/: (?, 16, 32, 32)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1/avg_pool/: (?, 16, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_1/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_2/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_3/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_4/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_1/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_2/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_3/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_4/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_5/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_1/residual_v1_6/: (?, 32, 16, 16)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1/avg_pool/: (?, 32, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1/: (?, 64, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_1/: (?, 64, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_2/: (?, 64, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_3/: (?, 64, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_4/: (?, 64, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_5/: (?, 64, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/stage_2/residual_v1_6/: (?, 64, 8, 8)
-INFO:tensorflow:image after unit resnet/tower_0/global_avg_pool/: (?, 64)
-INFO:tensorflow:image after unit resnet/tower_0/fully_connected/: (?, 11)
-```
-
-* @tobyboyd: Any special reason why resnets? And Maybe a diagram here?
-
 ### Highlights of the Tutorial
 
 * Complete code implementation that runs on local CPU, GPUs and on multiple hosts;
 * Explanation about how to run distributed TensorFlow using Experiments;
-* Details about how to create your own Hook;
+* Full code example on how to create a Hook;
 * Practical example of a input function built with the Dataset API;
-* Shows how to generate TFRecord files.
+* Practical example of how to generate TFRecord files.
 
 We hope that this guide provides a launch point for building general models
 with the Estimators API implementing support to multiple GPUs and multiple hosts.
@@ -109,16 +72,15 @@ File | Purpose
 [`model_base.py`](https://www.tensorflow.org/code/tensorflow_models/tutorials/image/cifar10_estimator/model_base.py) | Base for a ResNet model.
 
 
-## The Model Implementation
+## About the Implementation
 
-Here we'll mention some specific details about the implementation that we think
-is worth sharing.
+Here are some specific details about the implementation that we think is worth sharing.
 
 Before reading the following subsections check the arguments available for
 [`cifar10_main.py`](https://www.tensorflow.org/code/tensorflow_models/tutorials/image/cifar10_estimator/cifar10_main.py)
 described in the beginning of the file.
 
-### Variable Distribution and Gradient Aggregation
+### Multiple GPU Implementation
 
 During training, training variable values are updated using aggregated gradients and deltas.
 In this implementation we're folling the `parameter_server` implementation. More details can be found at
@@ -126,8 +88,6 @@ In this implementation we're folling the `parameter_server` implementation. More
 
 If you run `cifar10_main.py` with the `--is_cpu_ps=True` argument (default) the parameters will be saved on the
 CPU otherwise they will be spread across the available GPUs based on their size, for load balancing.
-
-### Multiple GPU Implementation
 
 The implementation is basically the same described at
 [Training a model using multiple gpu cards](https://www.tensorflow.org/tutorials/deep_cnn#training_a_model_using_multiple_gpu_cards).
@@ -138,28 +98,23 @@ Here is a diagram of this model:
   <img style="width:100%" src="https://www.tensorflow.org/images/Parallelism.png">
 </div>
 
-One important difference is that in the implementation presented here we can spread
-the parameters across the available GPUs as described in the previous subsection,
-in this case the gradients will be everaged and updated at the `/gpu:0`.
+If using `--is_cpu_ps=False` the gradients will be everaged and updated at the `/gpu:0` not
+in the CPU.
 
 ### Distributed Settings Terminology
 
-First of all is important to notice that when runing locally with multiple GPUs
+First, is important to notice that when runing locally with multiple GPUs
 we're doing in-graph replication and synchronous training (using gradient averaging).
 
 When running on distributed settings we're doint between-graph replication and we
 can choose between asynchronous training and synchronous training.
-We recommend to do synchronous training, for this we'll use [tf.train.SyncReplicasOptimizer](https://www.tensorflow.org/api_docs/python/tf/train/SyncReplicasOptimizer) as the model optimizer.
+We recommend doing synchronous training, for this we'll use [tf.train.SyncReplicasOptimizer](https://www.tensorflow.org/api_docs/python/tf/train/SyncReplicasOptimizer) as the model optimizer.
 
 So in summary we're using between-graph replication for distributed training, 
 and in-graph replication for using multiple GPUs in each worker.
 
 Read [deploy/distributed/replicated_training](https://www.tensorflow.org/deploy/distributed#replicated_training)
 for details about the terminology used.
-
-### Building a Custom Hook
-
-* @tobyboyd: add some comments about how to do it?
 
 ### Distributed TensorFlow with Experiments
 
@@ -198,8 +153,6 @@ you'll only need a `TF_CONFIG` environment variable setted up properly on each h
 You can set up the hosts manually or check [tensorflow/ecosystem](https://github.com/tensorflow/ecosystem)
 for instructions about how to set up a Cluster.
 
-@tobyboyd: link to Google Cloud MLE?
-
 The `TF_CONFIG` will be used by the [`RunConfig`](https://github.com/tensorflow/tensorflow/blob/master/tensorflow/contrib/learn/python/learn/estimators/run_config.py)
 to know the existing hosts and their task: `master`, `ps` or `worker`.
 
@@ -220,7 +173,7 @@ TF_CONFIG = json.dumps(
 
 *Cluster*
 
-A cluster spec, which is basically a dictionary that describes all of the tasks in the cluster. More about it [here](https://www.tensorflow.org/deploy/distributed).
+A cluster spec, which is basically a dictionary that describes all of the tasks in the cluster. More about it at [tensorflow/deploy/distributed](https://www.tensorflow.org/deploy/distributed).
 
 In this cluster spec we are defining a cluster with 1 master, 1 ps and 1 worker.
 
@@ -259,7 +212,7 @@ For a multi host environment you may want to use a Distributed File System, Goog
 
 By default the environment is *local*, for a distributed setting we need to change it to *cloud*.
 
-## The input pipeline implementation
+## The Input Pipeline
 
 We need to implement an input function to feed the features and labels
 (in case of supervisoned learning) to the Estimator. We'll use the
@@ -368,24 +321,24 @@ and **iterators**.
 
 ## Running and Checking Results
 
-Here we'll discuss a quick experiment running this model with multiple GPUs on a local and distributed
-environment. In order to show what to expect to see when running your models on similar settings.
+We'll discuss a quick demo of this model running with multiple GPUs on local and distributed
+environments. This demo is not a benchmark, it was made as a practical example of what to
+expect when running models with multiple GPUs and multiple hosts.
 
-We've trained the model on locally with 1, 2, 4 and 8 GPUs, and on distributed settings
-with 1 master with 4 gpus, 1 worker with 4 gpus and 1 ps with 1 CPU manually configured using
-only a `TF_CONFIG` to do this.
-
-We defined the batch size as a contast value of 128 per gpu, which means that if we're using
-4 GPUs, per example, the total batch size will actually be 512.
+We've trained the model locally with 1, 2, 4 and 8 GPUs, and on distributed settings
+with 1 master with 4 gpus, 1 worker with 4 gpus and 1 ps with 1 CPU. These were manually
+configured using only a `TF_CONFIG` to do this.
 
 ### Images/sec
 
 We should expect an almost linear increase in the *images/sec* metric as we add more gpus
 since we're increasing the batch size along with the number of GPUs used, and the reason
-why this may not be linear is that the model is probably not big enough to have a big
+why this may not be linear is that the model is not big enough to have a great
 improvement from using a lot of GPUs.
 
-* @monteirom: add images/sec graph
+<div style="width:95%; margin:auto; margin-bottom:10px; margin-top:20px;">
+  <img style="width:80%" src="../images/resnet_estimator_images_sec.png">
+</div>
 
 > **EXERCISE**: Add more layers to the model and see if you get closer to a linear increase along with
 the number of GPUs.
@@ -398,8 +351,19 @@ learning rate accordingly to the batch size (number of gpus) since larger mini-b
 variance of your stochastic gradient updates (considering that we're averaging the gradients in the mini-batch),
 and this allows bigger step sizes.
 
-* @monteirom: add accuracy graph
-* @tobyboyd: any papers to point to about this?
+Number of GPUs | Distributed | Best accuracy |
+-------------- | ----------- | ------------- |
+1              |     No      |     0.9297    |
+2              |     No      |     0.9297    |
+4              |     No      |     0.9121    |
+8              |     No      |     0.9127    |
+8              |     Yes     |     0.9174    |
+
+Accuracy over time using TensorBoard for visualization:
+
+<div style="width:95%; margin:auto; margin-bottom:10px; margin-top:20px;">
+  <img style="width:80%" src="../images/resnet_estimator_accuracy.png">
+</div>
 
 > **EXERCISE**: Play with the hyperparameters trying to tune the model.
 
@@ -414,22 +378,24 @@ These small tunings can make a big difference while scaling your model.
 We should expect to see similar `global_step/sec` for each execution and slightly
 smaller values when adding more gpus because of the overhead of dealing with multiple devices/hosts.
 
-* @monteirom: add global_step/sec graph
+*global_step/sec* over time using TensorBoard for visualization:
 
-Even though we're getting the same (or smaller) `global_step/sec` we still train faster because
-we can decrease the number of train steps as we increase the number of GPUs / batch size,
-because we have more devices training in parallel, but as said before we should still see
-similar accuracy.
+<div style="width:95%; margin:auto; margin-bottom:10px; margin-top:20px;">
+  <img style="width:80%" src="../images/resnet_estimator_global_step.png">
+</div>
 
-* @monteirom: add relative graph
+Even though we're not getting the exact same `global_step/sec` we should see a speed up
+when adding GPUs since we need to train for less steps to train for the same number of epochs.
+
+<div style="width:95%; margin:auto; margin-bottom:10px; margin-top:20px;">
+  <img style="width:80%" src="../images/resnet_estimator_speedup.png">
+</div>
 
 > **EXERCISE**: Run this model with a constant batch size and with different number of GPUs
-(e.g. 1, 2 and 4 gpus) you should the global_step/sec increaseing as you add GPUs.
+(e.g. 1, 2 and 4 gpus) you should the global_step/sec increasing as you add GPUs.
 This also means the model should train faster as you add GPUs. This approach is not as
 scalable as defining a constant batch size per GPU since at some point the batch size will
 get very small for each GPU.
-
-* @tobyboyd: find someone to help us do this section more technical?
 
 ### Reproducing this Experiment
 
@@ -537,18 +503,17 @@ For the PS:
 
 ### Methodology
 
-In order to create results that are as repeatable as possible, even though this is not a benchmark,
-each test was run 3 times and then the times were averaged together for the *images/sec* metric,
-for the accuracy graph we used the best accuracy we found while training, and for the
-*global_step/sec* accuracy all 3 runs got very similar graphs over time, so we picked the runs
-that had the best accuracy as well. GPUs are run in their default state on the given platform.
-For NVIDIA® Tesla® K80 this means leaving on [GPU
-Boost](https://devblogs.nvidia.com/parallelforall/increase-performance-gpu-boost-k80-autoboost/).
+In order to create results that are as repeatable as possible each test was run 3 times and
+then the times were averaged together for the *images/sec* metric, for the accuracy graph
+we used the best accuracy we found while training, and for the *global_step/sec* accuracy all
+3 runs got very similar graphs over time, so we picked the runs that had the best accuracy as well.
+We defined the batch size as a contast value of 128 per gpu, which means that if we're using 4 GPUs, per example, the total batch size will actually be 512. GPUs are run in their default state on the given platform.
+For NVIDIA® Tesla® K80 this means leaving on [GPU Boost](https://devblogs.nvidia.com/parallelforall/increase-performance-gpu-boost-k80-autoboost/).
 
 ## Visualizing results with TensorFlow
 
-When using Estimators you can also visualize your data in TensorBoard, and that's what we did
-for the accuracy and *global_step/sec* graphs available in this guide.
+When using Estimators you can use TensorBoard for visualization with no changes in the code,
+and that's what we did for the accuracy and *global_step/sec* graphs available in this guide.
 
 ```shell
 # Check TensorBoard during training or after it.
