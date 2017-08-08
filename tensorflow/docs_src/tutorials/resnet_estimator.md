@@ -365,13 +365,10 @@ Accuracy over time using TensorBoard for visualization:
   <img style="width:80%" src="../images/resnet_estimator_accuracy.png">
 </div>
 
-> **EXERCISE**: Play with the hyperparameters trying to tune the model.
+Changing hyperparameters is important and can make a big difference when
+scaling your model.
 
-* @monteirom: verify these values;
-An example why changing hyperparameters is important is that we tried to run this model with
-initial learning rate of 0.1 with 8 gpus and weight decay of 1e-4, and the maximum accuracy we
-got was about 85%, against 91% with initial learning rate of 0.8 and weight decay of 2e-4.
-These small tunings can make a big difference while scaling your model.
+> **EXERCISE**: Play with the hyperparameters trying to tune the model.
 
 ### Global_step/sec
 
